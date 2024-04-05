@@ -18,26 +18,35 @@ func main() {
 	mux := router.NewRouterMux()
 	fs := http.FileServer(http.Dir("./static"))
 	db, err := dbservice.MakeDBService()
-	log.Printf("Initialized DB")
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	mux.Handle("GET", "/static/**", NoTrailingSlash(http.StripPrefix("/static/", fs)))
+	mux.Get("/", IndexPageHandler(db))
+	mux.Post("/", CreateLinkHandler(db))
+	mux.Get("/*", RedirectHandler(db))
 
-	mux.Get("/", func(w http.ResponseWriter, r *http.Request) {
+	log.Printf("Started server")
+	http.ListenAndServe(":1234", &mux)
+}
+
+func IndexPageHandler(db dbservice.DBService) http.HandlerFunc {
+	return func (w http.ResponseWriter, r *http.Request) {
 		tmpl, err := template.ParseFiles("templates/index.html")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-
+	
 		if err := tmpl.Execute(w, nil); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
-	})
+	}
+}
 
-	mux.Post("/", func(w http.ResponseWriter, r *http.Request) {
+func CreateLinkHandler(db dbservice.DBService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
 			http.Error(w, "Couldn't parse sent form", http.StatusBadRequest)
 			return
@@ -60,17 +69,20 @@ func main() {
 		}
 
 		tmplData := struct {
-			Slug, Full string
+			Slug, Full, Host string
 		}{
 			Slug: slug,
 			Full: clientUrl,
+			Host: r.Host,
 		}
 		if err := tmpl.Execute(w, &tmplData); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
-	})
+	}
+}
 
-	mux.Get("/*", func(w http.ResponseWriter, r *http.Request) {
+func RedirectHandler(db dbservice.DBService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		slug := router.PathPart(r.URL, 0)
 		fullUrl, err := db.GetUrl(slug)
 		if err != nil {
@@ -79,10 +91,7 @@ func main() {
 		}
 
 		http.Redirect(w, r, fullUrl, http.StatusMovedPermanently)
-	})
-
-	fmt.Printf("Started server at localhost:1234\n")
-	http.ListenAndServe(":1234", &mux)
+	}
 }
 
 func NoTrailingSlash(next http.Handler) http.Handler {

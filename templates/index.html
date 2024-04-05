@@ -13,7 +13,7 @@
     {{if .}}
         <span>Created new link to <a href="{{ .Full }}">{{ .Full }}</a></span> <br />    
         <!-- TODO: Hotsname instead of localhost -->
-        <a href="/{{ .Slug }}">https://localhost:1234/{{ .Slug }}</a>
+        <a href="/{{ .Slug }}">{{ .Host }}/{{ .Slug }}</a>
     {{end}}
 </body>
 </html>
