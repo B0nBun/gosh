@@ -1,29 +1,30 @@
 package router
 
-import "net/http"
-import "strings"
-import "fmt"
-
-type Handler func(http.ResponseWriter, *http.Request, map[string]string)
+import (
+	"fmt"
+	"net/http"
+	"net/url"
+	"strings"
+)
 
 type route struct {
 	method  string
 	pattern string
-	handler Handler
+	handler http.Handler
 }
 
 type RouterMux struct {
 	routes   []route
-	notFound Handler
+	notFound http.Handler
 }
 
 func NewRouterMux() RouterMux {
 	return RouterMux{
-		notFound: default404Handler,
+		notFound: http.HandlerFunc(http.NotFound),
 	}
 }
 
-func (mux *RouterMux) Handle(method, pattern string, handler Handler) {
+func (mux *RouterMux) Handle(method, pattern string, handler http.Handler) {
 	if len(pattern) == 0 || !strings.HasPrefix(pattern, "/") {
 		panic(fmt.Sprintf("Invalid pattern argument '%s': Pattern has to start with '/'", pattern))
 	}
@@ -37,7 +38,23 @@ func (mux *RouterMux) Handle(method, pattern string, handler Handler) {
 	})
 }
 
-func (mux *RouterMux) HandleNotFound(handler Handler) {
+func (mux *RouterMux) HandleFunc(method, pattern string, handler http.HandlerFunc) {
+	mux.Handle(method, pattern, handler)
+}
+
+func (mux *RouterMux) Get(pattern string, handler http.HandlerFunc) {
+	mux.Handle("GET", pattern, handler)
+}
+
+func (mux *RouterMux) Post(pattern string, handler http.HandlerFunc) {
+	mux.Handle("POST", pattern, handler)
+}
+
+func (mux *RouterMux) Delete(pattern string, handler http.HandlerFunc) {
+	mux.Handle("DELETE", pattern, handler)
+}
+
+func (mux *RouterMux) HandleNotFound(handler http.Handler) {
 	mux.notFound = handler
 }
 
@@ -47,33 +64,35 @@ func (mux *RouterMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if route.method != "*" && route.method != r.Method {
 			continue
 		}
-		ok, params := match(route.pattern, parts)
+		ok := match(route.pattern, parts)
 		if !ok {
 			continue
 		}
-		route.handler(w, r, params)
-		break
+		fmt.Printf("Handling '%v' with %+v\n", r.URL.Path, route)
+		route.handler.ServeHTTP(w, r)
+		return
 	}
 
-	mux.notFound(w, r, nil)
+	mux.notFound.ServeHTTP(w, r)
 }
 
-func default404Handler(w http.ResponseWriter, r *http.Request, _ map[string]string) {
-	http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+func PathPart(url *url.URL, n int) string {
+	return strings.Split(url.Path, "/")[1:][n]
 }
 
-func match(pattern string, rpath []string) (ok bool, params map[string]string) {
+func match(pattern string, rpath []string) (ok bool) {
 	split := strings.Split(pattern, "/")[1:]
 	if len(split) != len(rpath) {
 		ok = false
 		return
 	}
-	params = make(map[string]string)
 	for i := 0; i < len(split); i++ {
-		if strings.HasPrefix(split[i], ":") {
-			name := strings.TrimPrefix(split[i], ":")
-			params[name] = rpath[i]
+		if split[i] == "*" {
 			continue
+		}
+		if split[i] == "**" {
+			ok = true
+			return
 		}
 		if rpath[i] != split[i] {
 			ok = false
