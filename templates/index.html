@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <form method="POST" action="/">
+        <input name="url" type="url" />
+        <button type="submit">Submit</button>
+    </form>
+    {{if .}}
+        <span>Created new link to <a href="{{ .Full }}">{{ .Full }}</a></span> <br />    
+        <!-- TODO: Hotsname instead of localhost -->
+        <a href="/{{ .Slug }}">https://localhost:1234/{{ .Slug }}</a>
+    {{end}}
+</body>
+</html>

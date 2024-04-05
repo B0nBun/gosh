@@ -50,10 +50,6 @@ func (mux *RouterMux) Post(pattern string, handler http.HandlerFunc) {
 	mux.Handle("POST", pattern, handler)
 }
 
-func (mux *RouterMux) Delete(pattern string, handler http.HandlerFunc) {
-	mux.Handle("DELETE", pattern, handler)
-}
-
 func (mux *RouterMux) HandleNotFound(handler http.Handler) {
 	mux.notFound = handler
 }
@@ -68,7 +64,6 @@ func (mux *RouterMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			continue
 		}
-		fmt.Printf("Handling '%v' with %+v\n", r.URL.Path, route)
 		route.handler.ServeHTTP(w, r)
 		return
 	}
