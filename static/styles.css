@@ -102,6 +102,24 @@ form {
     display: flex;
     flex-direction: row;
     gap: .25rem;
+    position: relative;
+}
+
+form::before {
+    content: attr(data-label);
+    color: var(--accent-color);
+    position: absolute;
+    font-size: 1rem;
+    top: -1.25em;
+    transition: opacity .2s ease-in-out;
+}
+
+form[data-label=""]::before {
+    opacity: 0;
+}
+
+form:not([data-label=""])::before {
+    opacity: 1;
 }
 
 @media (max-width: 500px) {
@@ -118,13 +136,11 @@ input, button {
 
 input {
     width: 100%;
-}
-
-input {
     border-radius: .25rem;
     border: 2px solid var(--primary-color);
     background-color: transparent;
     color: var(--primary-color);
+    position: relative;
 }
 
 button {
