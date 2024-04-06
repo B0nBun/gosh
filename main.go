@@ -6,13 +6,12 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"strings"
 
 	"gosh/dbservice"
 	"gosh/router"
 )
 
-// TODO: Minifiers + Gzip
+// TODO: Minifiers
 
 func main() {
 	mux := router.NewRouterMux()
@@ -22,9 +21,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	mux.Handle("GET", "/static/**", NoTrailingSlash(http.StripPrefix("/static/", fs)))
-	mux.Get("/", IndexPageHandler(db))
-	mux.Post("/", CreateLinkHandler(db))
+	mux.Handle("GET", "/static/**", Gzip(NoTrailingSlash(http.StripPrefix("/static/", fs))))
+	mux.Get("/", Gzip(IndexPageHandler(db)))
+	mux.Post("/", Gzip(CreateLinkHandler(db)))
 	mux.Get("/*", RedirectHandler(db))
 
 	log.Printf("Started server")
@@ -92,15 +91,4 @@ func RedirectHandler(db dbservice.DBService) http.HandlerFunc {
 
 		http.Redirect(w, r, fullUrl, http.StatusMovedPermanently)
 	}
-}
-
-func NoTrailingSlash(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasSuffix(r.URL.Path, "/") {
-			http.NotFound(w, r)
-			return
-		}
-
-		next.ServeHTTP(w, r)
-	})
 }
