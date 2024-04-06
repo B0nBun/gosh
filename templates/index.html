@@ -7,15 +7,19 @@
     <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
+    <!-- TODO: JS Validation -->
     <main>
+        <div id="blob1" class="blob"></div>
+        <div id="blob2" class="blob"></div>
+        <div id="blob3" class="blob"></div>
+        <div id="blob4" class="blob"></div>
         <h1>Shorten Your URLs</h1>
         <form method="POST" action="/">
             <input name="url" type="url" />
-            <button type="submit">Submit</button>
+            <button type="submit">Shorten</button>
         </form>
         {{if .}}
             <section class="created">
-                <!-- <span>Created new link to <a href="{{ .Full }}">{{ .Full }}</a></span> <br />     -->
                 <h2>
                     <a href="/{{ .Slug }}">{{ .Host }}/{{ .Slug }}</a>
                 </h2>
@@ -25,5 +29,8 @@
             </section>
         {{end}}
     </main>
+    <footer>
+        Footer
+    </footer>
 </body>
 </html>

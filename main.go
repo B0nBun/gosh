@@ -12,6 +12,7 @@ import (
 )
 
 // TODO: Minifiers
+// TODO: Gzip static files ahead of time?
 
 func main() {
 	mux := router.NewRouterMux()
