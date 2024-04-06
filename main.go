@@ -6,6 +6,8 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"compress/gzip"
+	"flag"
 
 	"gosh/dbservice"
 	"gosh/router"
@@ -16,15 +18,28 @@ import (
 
 func main() {
 	mux := router.NewRouterMux()
-	fs := http.FileServer(http.Dir("./static"))
 	db, err := dbservice.MakeDBService()
 	if err != nil {
 		log.Fatal(err)
 	}
+	
+	zip := flag.Bool("zip", false, "set this flag to compress static files ahead of time")
+	flag.Parse()
 
-	mux.Handle("GET", "/static/**", Gzip(NoTrailingSlash(http.StripPrefix("/static/", fs))))
-	mux.Get("/", Gzip(IndexPageHandler(db)))
-	mux.Post("/", Gzip(CreateLinkHandler(db)))
+	var fs http.Handler
+	if *zip {
+		log.Println("Compressing static files ahead of time")
+		fs, err = ZippedFileServer("./static", "./static-zipped")
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		log.Println("Using uncompressed static files")
+		fs = Gzip(gzip.DefaultCompression, http.FileServer(http.Dir("./static")))
+	}
+	mux.Handle("GET", "/static/**", NoTrailingSlash(http.StripPrefix("/static/", fs)))
+	mux.Get("/", Gzip(gzip.DefaultCompression, IndexPageHandler(db)))
+	mux.Post("/", Gzip(gzip.DefaultCompression, CreateLinkHandler(db)))
 	mux.Get("/*", RedirectHandler(db))
 
 	log.Printf("Started server")
