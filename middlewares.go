@@ -1,10 +1,10 @@
 package main
 
 import (
+	"compress/gzip"
+	"io"
 	"net/http"
 	"strings"
-	"io"
-	"compress/gzip"
 )
 
 func NoTrailingSlash(next http.Handler) http.Handler {
@@ -36,7 +36,7 @@ func Gzip(level int, handler http.Handler) http.HandlerFunc {
 		w.Header().Set("Content-Encoding", "gzip")
 		writer, _ := gzip.NewWriterLevel(w, level)
 		defer writer.Close()
-		responseWr := GzipResponseWriter { Writer: writer, ResponseWriter: w }
+		responseWr := GzipResponseWriter{Writer: writer, ResponseWriter: w}
 		handler.ServeHTTP(responseWr, r)
 	}
 }

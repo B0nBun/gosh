@@ -1,12 +1,12 @@
 package main
 
 import (
+	"compress/gzip"
 	"io"
 	"io/fs"
 	"net/http"
-	"path"
 	"os"
-	"compress/gzip"
+	"path"
 	"strings"
 )
 
@@ -16,7 +16,7 @@ func ZippedFileServer(source string, target string) (http.Handler, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = fs.WalkDir(fsys, ".", func (relPath string, d fs.DirEntry, err error) error {
+	err = fs.WalkDir(fsys, ".", func(relPath string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -51,7 +51,7 @@ func ZippedFileServer(source string, target string) (http.Handler, error) {
 
 	zippedFS := http.FileServer(http.Dir(target))
 	normalFS := http.FileServer(http.Dir(source))
-	var handler http.HandlerFunc = func (w http.ResponseWriter, r *http.Request) {
+	var handler http.HandlerFunc = func(w http.ResponseWriter, r *http.Request) {
 		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 			normalFS.ServeHTTP(w, r)
 			return

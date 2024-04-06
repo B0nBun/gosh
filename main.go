@@ -1,13 +1,13 @@
 package main
 
 import (
+	"compress/gzip"
+	"flag"
 	"fmt"
 	"html/template"
 	"log"
 	"net/http"
 	"net/url"
-	"compress/gzip"
-	"flag"
 
 	"gosh/dbservice"
 	"gosh/router"
@@ -21,7 +21,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	
+
 	zip := flag.Bool("zip", false, "set this flag to compress static files ahead of time")
 	flag.Parse()
 
@@ -46,13 +46,13 @@ func main() {
 }
 
 func IndexPageHandler(db dbservice.DBService) http.HandlerFunc {
-	return func (w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		tmpl, err := template.ParseFiles("templates/index.html")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-	
+
 		if err := tmpl.Execute(w, nil); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
