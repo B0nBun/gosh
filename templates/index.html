@@ -13,19 +13,28 @@
         <div id="blob2" class="blob"></div>
         <div id="blob3" class="blob"></div>
         <div id="blob4" class="blob"></div>
-        <h1>Shorten Your URLs</h1>
+        <h1>
+            <a href="/">
+                Shorten Your URLs
+            </a>
+        </h1>
         <form method="POST" action="/">
             <input name="url" type="url" />
             <button type="submit">Shorten</button>
         </form>
         {{if .}}
             <section class="created">
-                <h2>
-                    <a href="/{{ .Slug }}">{{ .Host }}/{{ .Slug }}</a>
-                </h2>
-                <h2>
-                    <a href="{{ .Full }}">{{ .Full }}</a>
-                </h2>
+                <button
+                    onclick="navigator.clipboard.writeText(this.dataset.tocopy).then(() => this.dataset.label = 'copied!')"
+                    data-tocopy="{{ .Host }}/{{ .Slug }}"
+                    data-label="copy!"
+                    class="short"
+                >
+                    {{ .Host }}/{{ .Slug }}
+                </button>
+                <a class="full" href="{{ .Full }}">
+                    {{ .Full }}
+                </a>
             </section>
         {{end}}
     </main>

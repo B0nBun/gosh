@@ -5,7 +5,7 @@
 
 :root {
     --primary-color: #1f2937;
-    --primary-color-focus: #030712;
+    --accent-color: #e11d48;
     --bg-color: #e5e7eb;
 }
 
@@ -30,7 +30,7 @@ main {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 1rem;
+    gap: 2rem;
     position: relative;
 }
 
@@ -90,6 +90,10 @@ h1 {
     margin: 0;
     font-size: 3rem;
     text-align: center;
+}
+
+h1 a {
+    text-decoration: none;
     color: var(--primary-color);
 }
 
@@ -136,8 +140,50 @@ button:hover {
 }
 
 .created {
-    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .5rem;
+}
+
+.created a {
     word-break: break-all;
+    text-align: center;
+    text-decoration: none;
+    color: initial;
+    font-size: 1.5rem;
+    border-radius: .25rem;
+    padding: .5rem 1rem;
+}
+
+.created a:hover {
+    text-decoration: underline;
+}
+
+.created .short {
+    background-color: #e11d48;
+    color: var(--bg-color);
+    font-weight: lighter;
+    transition: transform .2s ease-in-out;
+}
+
+.created .short:hover {
+    transform: scale(1.05);
+}
+
+.created .short::after {
+    content: attr(data-label);
+    display: block;
+    font-size: .75em;
+    opacity: .75;
+}
+
+.created .full {
+    opacity: .5;
+}
+
+.created .full:hover {
+    opacity: 1;
 }
 
 footer {
