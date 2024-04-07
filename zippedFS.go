@@ -11,6 +11,7 @@ import (
 	"github.com/tdewolff/minify/v2"
 	mcss "github.com/tdewolff/minify/v2/css"
 	mjs "github.com/tdewolff/minify/v2/js"
+	msvg "github.com/tdewolff/minify/v2/svg"
 )
 
 func ZippedFileServer(source string, target string) (http.Handler, error) {
@@ -69,26 +70,21 @@ func ZippedFileServer(source string, target string) (http.Handler, error) {
 const (
 	mimeCSS = "text/css"
 	mimeJS = "text/javascript"
+	mimeSVG = "image/svg+xml"
 )
 
 func getMinifier() *minify.M {
 	m := minify.New()
 	m.AddFunc(mimeCSS, mcss.Minify)
 	m.AddFunc(mimeJS, mjs.Minify)
+	m.AddFunc(mimeSVG, msvg.Minify)
 	return m
 }
 
-func mediaType(filename string) (mediaTy string, canMinify bool) {
-	canMinify = true
-	switch path.Ext(filename) {
-	case ".css":
-		mediaTy = mimeCSS
-	case ".js":
-		mediaTy = mimeJS
-	default:
-		canMinify = false
-	}
-	return
+var mimeTypes = map[string]string {
+	".css": mimeCSS,
+	".js": mimeJS,
+	".svg": mimeSVG,
 }
 
 func minifyAndGzip(m *minify.M, source, target *os.File) error {
@@ -96,9 +92,10 @@ func minifyAndGzip(m *minify.M, source, target *os.File) error {
 	if err != nil {
 		return err
 	}
-	mediatype, canMinify := mediaType(source.Name())
+	extension := path.Ext(source.Name())
+	mimeType, canMinify := mimeTypes[extension]
 	if canMinify {
-		if err := m.Minify(mediatype, gzipw, source); err != nil {
+		if err := m.Minify(mimeType, gzipw, source); err != nil {
 			gzipw.Close()
 			return err
 		}
