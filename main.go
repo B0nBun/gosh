@@ -8,6 +8,8 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"sync"
+	"time"
 
 	"gosh/dbservice"
 	mw "gosh/middleware"
@@ -30,14 +32,41 @@ func main() {
 	fs := FileServer(*zip)
 	log.Printf("Created a fileserver (compressed static files = %v)", *zip)
 
+	stats := LinksStats{}
+	go LinksStatsUpdater(log.Default(), &db, &stats)	
+
 	mux := router.NewRouterMux()
 	mux.Get("/static/**", mw.Logging(log.Default(), mw.NoTrailingSlash(http.StripPrefix("/static/", fs))))
-	mux.Get("/", mw.Logging(log.Default(), mw.Gzip(gzip.DefaultCompression, IndexPageHandler(&db))))
-	mux.Post("/", mw.Logging(log.Default(), mw.Gzip(gzip.DefaultCompression, CreateLinkHandler(&db))))
+	mux.Get("/", mw.Logging(log.Default(), mw.Gzip(gzip.DefaultCompression, IndexPageHandler(&db, &stats))))
+	mux.Post("/", mw.Logging(log.Default(), mw.Gzip(gzip.DefaultCompression, CreateLinkHandler(&db, &stats))))
 	mux.Get("/*", mw.Logging(log.Default(), RedirectHandler(&db, mux.NotFound)))
 
 	log.Printf("Started server at address '%s'", *addr)
 	http.ListenAndServe(*addr, &mux)
+}
+
+type LinksStats struct {
+	mu sync.Mutex
+	UrlsCount, RedirectsCount int
+}
+
+const UpdaterInterval = 60 * time.Second
+func LinksStatsUpdater(logger *log.Logger, db *dbservice.DBService, stats *LinksStats) {
+	for {
+		visits, err := db.TotalVisits()
+		if err != nil {
+			logger.Printf("Updater error %v", err)
+		}
+		urls, err := db.TotalUrls()
+		if err != nil {
+			logger.Printf("Updater error %v", err)
+		}
+		stats.mu.Lock()
+		stats.UrlsCount = urls
+		stats.RedirectsCount = visits
+		stats.mu.Unlock()
+		time.Sleep(UpdaterInterval)
+	}
 }
 
 const StaticFilesPath = "./static"
@@ -58,20 +87,8 @@ type CreatedLink struct {
 	Slug, Full, Host string
 }
 
-type LinksStats struct {
-	UrlsCount, RedirectsCount int
-}
-
-func indexTemplate(w http.ResponseWriter, created *CreatedLink, db *dbservice.DBService) error {
+func indexTemplate(w http.ResponseWriter, created *CreatedLink, stats *LinksStats) error {
 	tmpl, err := template.ParseFiles("templates/index.html")
-	if err != nil {
-		return err
-	}
-	urls, err := db.TotalUrls()
-	if err != nil {
-		return err
-	}
-	visits, err := db.TotalVisits()
 	if err != nil {
 		return err
 	}
@@ -80,23 +97,21 @@ func indexTemplate(w http.ResponseWriter, created *CreatedLink, db *dbservice.DB
 		Stats *LinksStats
 	}
 	tmplData.Created = created
-	// TODO: Update these stats periodically, instead of every request
-	tmplData.Stats = &LinksStats{
-		UrlsCount: urls,
-		RedirectsCount: visits,
-	}
+	stats.mu.Lock()
+	defer stats.mu.Unlock()
+	tmplData.Stats = stats
 	return tmpl.Execute(w, &tmplData)
-} 
+}
 
-func IndexPageHandler(db *dbservice.DBService) http.HandlerFunc {
+func IndexPageHandler(db *dbservice.DBService, stats *LinksStats) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if err := indexTemplate(w, nil, db); err != nil {
+		if err := indexTemplate(w, nil, stats); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	}
 }
 
-func CreateLinkHandler(db *dbservice.DBService) http.HandlerFunc {
+func CreateLinkHandler(db *dbservice.DBService, stats *LinksStats) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
 			http.Error(w, "Couldn't parse sent form", http.StatusBadRequest)
@@ -119,7 +134,7 @@ func CreateLinkHandler(db *dbservice.DBService) http.HandlerFunc {
 			Full: clientUrl,
 			Host: r.Host,
 		}
-		if err := indexTemplate(w, &created, db); err != nil {
+		if err := indexTemplate(w, &created, stats); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	}
