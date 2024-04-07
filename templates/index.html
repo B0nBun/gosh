@@ -23,18 +23,18 @@
             <input id="url-input" name="url" type="url" />
             <button type="submit">Shorten</button>
         </form>
-        {{if .}}
+        {{if .Created}}
             <section class="created">
                 <button
                     onclick="navigator.clipboard.writeText(this.dataset.tocopy).then(() => this.dataset.label = 'copied!')"
-                    data-tocopy="{{ .Host }}/{{ .Slug }}"
+                    data-tocopy="{{ .Created.Host }}/{{ .Created.Slug }}"
                     data-label="copy!"
                     class="short"
                 >
-                    {{ .Host }}/{{ .Slug }}
+                    {{ .Created.Host }}/{{ .Created.Slug }}
                 </button>
-                <a class="full" href="{{ .Full }}">
-                    {{ .Full }}
+                <a class="full" href="{{ .Created.Full }}">
+                    {{ .Created.Full }}
                 </a>
             </section>
         {{end}}
@@ -44,9 +44,8 @@
             <img src="/static/github-logo.svg" height="25" />
         </a>
         <div class="stats">
-            <!-- TODO: Update stats -->
-            <span>Created: 1243</span>,
-            <span>Redirected: 7521</span>
+            <span>Created: {{ .Stats.UrlsCount }}</span>,
+            <span>Redirected: {{ .Stats.RedirectsCount }}</span>
         </div>
     </footer>
 </body>

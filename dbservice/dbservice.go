@@ -49,7 +49,7 @@ func MakeDBService(dsName string) (s DBService, err error) {
 func (s *DBService) CreateShortenedUrl(url string) (string, error) {
 	for {
 		slug := randAlphanumString(SlugLen)
-		res, err := s.db.Exec("insert into shorturls (slug, url) values (?, ?)", slug, url)
+		res, err := s.db.Exec("insert into shorturls (slug, url) values (?, ?);", slug, url)
 		if err != nil {
 			return "", err
 		}
@@ -64,9 +64,18 @@ func (s *DBService) CreateShortenedUrl(url string) (string, error) {
 }
 
 func (s *DBService) GetUrl(slug string) (url string, err error, exists bool) {
-	// TODO: Increment visits
-	err = s.db.QueryRow("select url from shorturls where slug = $1", slug).Scan(&url)
+	err = s.db.QueryRow("update shorturls set visits = visits + 1 where slug = $1 returning url;", slug).Scan(&url)
 	exists = err != sql.ErrNoRows
+	return
+}
+
+func (s *DBService) TotalUrls() (count int, err error) {
+	err = s.db.QueryRow("select count(*) from shorturls;").Scan(&count)
+	return
+}
+
+func (s *DBService) TotalVisits() (count int, err error) {
+	err = s.db.QueryRow("select ifnull(sum(visits), 0) from shorturls;").Scan(&count)
 	return
 }
 

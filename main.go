@@ -21,6 +21,7 @@ func main() {
 	flag.Parse()
 
 	db, err := dbservice.MakeDBService(*dsName)
+	defer db.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -31,9 +32,9 @@ func main() {
 
 	mux := router.NewRouterMux()
 	mux.Get("/static/**", mw.Logging(log.Default(), mw.NoTrailingSlash(http.StripPrefix("/static/", fs))))
-	mux.Get("/", mw.Logging(log.Default(), mw.Gzip(gzip.DefaultCompression, IndexPageHandler(db))))
-	mux.Post("/", mw.Logging(log.Default(), mw.Gzip(gzip.DefaultCompression, CreateLinkHandler(db))))
-	mux.Get("/*", mw.Logging(log.Default(), RedirectHandler(db, mux.NotFound)))
+	mux.Get("/", mw.Logging(log.Default(), mw.Gzip(gzip.DefaultCompression, IndexPageHandler(&db))))
+	mux.Post("/", mw.Logging(log.Default(), mw.Gzip(gzip.DefaultCompression, CreateLinkHandler(&db))))
+	mux.Get("/*", mw.Logging(log.Default(), RedirectHandler(&db, mux.NotFound)))
 
 	log.Printf("Started server at address '%s'", *addr)
 	http.ListenAndServe(*addr, &mux)
@@ -53,21 +54,49 @@ func FileServer(zip bool) http.Handler {
 	return mw.Gzip(gzip.DefaultCompression, http.FileServer(http.Dir(StaticFilesPath)))
 }
 
-func IndexPageHandler(db dbservice.DBService) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		tmpl, err := template.ParseFiles("templates/index.html")
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+type CreatedLink struct {
+	Slug, Full, Host string
+}
 
-		if err := tmpl.Execute(w, nil); err != nil {
+type LinksStats struct {
+	UrlsCount, RedirectsCount int
+}
+
+func indexTemplate(w http.ResponseWriter, created *CreatedLink, db *dbservice.DBService) error {
+	tmpl, err := template.ParseFiles("templates/index.html")
+	if err != nil {
+		return err
+	}
+	urls, err := db.TotalUrls()
+	if err != nil {
+		return err
+	}
+	visits, err := db.TotalVisits()
+	if err != nil {
+		return err
+	}
+	var tmplData struct {
+		Created *CreatedLink
+		Stats *LinksStats
+	}
+	tmplData.Created = created
+	// TODO: Update these stats periodically, instead of every request
+	tmplData.Stats = &LinksStats{
+		UrlsCount: urls,
+		RedirectsCount: visits,
+	}
+	return tmpl.Execute(w, &tmplData)
+} 
+
+func IndexPageHandler(db *dbservice.DBService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if err := indexTemplate(w, nil, db); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	}
 }
 
-func CreateLinkHandler(db dbservice.DBService) http.HandlerFunc {
+func CreateLinkHandler(db *dbservice.DBService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
 			http.Error(w, "Couldn't parse sent form", http.StatusBadRequest)
@@ -82,28 +111,21 @@ func CreateLinkHandler(db dbservice.DBService) http.HandlerFunc {
 		slug, err := db.CreateShortenedUrl(clientUrl)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-
-		tmpl, err := template.ParseFiles("templates/index.html")
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		tmplData := struct {
-			Slug, Full, Host string
-		}{
+		created := CreatedLink {
 			Slug: slug,
 			Full: clientUrl,
 			Host: r.Host,
 		}
-		if err := tmpl.Execute(w, &tmplData); err != nil {
+		if err := indexTemplate(w, &created, db); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	}
 }
 
-func RedirectHandler(db dbservice.DBService, notFoundHandler http.Handler) http.HandlerFunc {
+func RedirectHandler(db *dbservice.DBService, notFoundHandler http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		slug := router.PathPart(r.URL, 0)
 		fullUrl, err, exists := db.GetUrl(slug)
@@ -116,6 +138,6 @@ func RedirectHandler(db dbservice.DBService, notFoundHandler http.Handler) http.
 			return
 		}
 
-		http.Redirect(w, r, fullUrl, http.StatusMovedPermanently)
+		http.Redirect(w, r, fullUrl, http.StatusSeeOther)
 	}
 }
