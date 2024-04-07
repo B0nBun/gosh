@@ -13,4 +13,4 @@ RUN go build -o /workspace/gosh_server
 
 EXPOSE 1234
 
-CMD [ "/workspace/gosh_server", "-zip" ]
+CMD [ "/workspace/gosh_server", "-zip", "-addr", "0.0.0.0:1234", "-ds", ":memory:" ]

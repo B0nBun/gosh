@@ -8,6 +8,9 @@ import (
 	"os"
 	"path"
 	"strings"
+	"github.com/tdewolff/minify/v2"
+	mcss "github.com/tdewolff/minify/v2/css"
+	mjs "github.com/tdewolff/minify/v2/js"
 )
 
 func ZippedFileServer(source string, target string) (http.Handler, error) {
@@ -16,6 +19,7 @@ func ZippedFileServer(source string, target string) (http.Handler, error) {
 	if err != nil {
 		return nil, err
 	}
+	m := getMinifier()
 	err = fs.WalkDir(fsys, ".", func(relPath string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -34,7 +38,7 @@ func ZippedFileServer(source string, target string) (http.Handler, error) {
 		if err != nil {
 			return err
 		}
-		if err := gzipFile(srcFile, zipFile); err != nil {
+		if err := minifyAndGzip(m, srcFile, zipFile); err != nil {
 			return err
 		}
 		if err := zipFile.Close(); err != nil {
@@ -62,15 +66,47 @@ func ZippedFileServer(source string, target string) (http.Handler, error) {
 	return handler, nil
 }
 
-func gzipFile(source, target *os.File) error {
-	w, err := gzip.NewWriterLevel(target, gzip.BestCompression)
+const (
+	mimeCSS = "text/css"
+	mimeJS = "text/javascript"
+)
+
+func getMinifier() *minify.M {
+	m := minify.New()
+	m.AddFunc(mimeCSS, mcss.Minify)
+	m.AddFunc(mimeJS, mjs.Minify)
+	return m
+}
+
+func mediaType(filename string) (mediaTy string, canMinify bool) {
+	canMinify = true
+	switch path.Ext(filename) {
+	case ".css":
+		mediaTy = mimeCSS
+	case ".js":
+		mediaTy = mimeJS
+	default:
+		canMinify = false
+	}
+	return
+}
+
+func minifyAndGzip(m *minify.M, source, target *os.File) error {
+	gzipw, err := gzip.NewWriterLevel(target, gzip.BestCompression)
 	if err != nil {
 		return err
 	}
-	_, err = io.Copy(w, source)
-	if err != nil {
-		w.Close()
-		return err
+	mediatype, canMinify := mediaType(source.Name())
+	if canMinify {
+		if err := m.Minify(mediatype, gzipw, source); err != nil {
+			gzipw.Close()
+			return err
+		}
+	} else {
+		if _, err := io.Copy(gzipw, source); err != nil {
+			gzipw.Close()
+			return err
+		}
 	}
-	return w.Close()
+	return gzipw.Close()
 }

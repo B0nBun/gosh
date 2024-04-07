@@ -10,39 +10,47 @@ import (
 	"net/url"
 
 	"gosh/dbservice"
+	mw "gosh/middleware"
 	"gosh/router"
 )
 
-// TODO: Minifiers
-
 func main() {
-	mux := router.NewRouterMux()
-	db, err := dbservice.MakeDBService()
+	zip := flag.Bool("zip", false, "set this flag to compress static files ahead of time")
+	dsName := flag.String("ds", ":memory:", "name of the datasource to use for SQLite3 database")
+	addr := flag.String("addr", "0.0.0.0:1234", "TCP address to use for the servers")
+	flag.Parse()
+
+	db, err := dbservice.MakeDBService(*dsName)
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Printf("Connected to the database")
 
-	zip := flag.Bool("zip", false, "set this flag to compress static files ahead of time")
-	flag.Parse()
+	fs := FileServer(*zip)
+	log.Printf("Created a fileserver (compressed static files = %v)", *zip)
 
-	var fs http.Handler
-	if *zip {
-		log.Println("Compressing static files ahead of time")
-		fs, err = ZippedFileServer("./static", "./static-zipped")
+	mux := router.NewRouterMux()
+	mux.Get("/static/**", mw.Logging(log.Default(), mw.NoTrailingSlash(http.StripPrefix("/static/", fs))))
+	mux.Get("/", mw.Logging(log.Default(), mw.Gzip(gzip.DefaultCompression, IndexPageHandler(db))))
+	mux.Post("/", mw.Logging(log.Default(), mw.Gzip(gzip.DefaultCompression, CreateLinkHandler(db))))
+	mux.Get("/*", mw.Logging(log.Default(), RedirectHandler(db)))
+
+	log.Printf("Started server at address '%s'", *addr)
+	http.ListenAndServe(*addr, &mux)
+}
+
+const StaticFilesPath = "./static"
+const StaticZippedFilesPath = "./static-zipped"
+
+func FileServer(zip bool) http.Handler {
+	if zip {
+		fs, err := ZippedFileServer(StaticFilesPath, StaticZippedFilesPath)
 		if err != nil {
 			log.Fatal(err)
 		}
-	} else {
-		log.Println("Using uncompressed static files")
-		fs = Gzip(gzip.DefaultCompression, http.FileServer(http.Dir("./static")))
+		return fs
 	}
-	mux.Handle("GET", "/static/**", NoTrailingSlash(http.StripPrefix("/static/", fs)))
-	mux.Get("/", Gzip(gzip.DefaultCompression, IndexPageHandler(db)))
-	mux.Post("/", Gzip(gzip.DefaultCompression, CreateLinkHandler(db)))
-	mux.Get("/*", RedirectHandler(db))
-
-	log.Printf("Started server")
-	http.ListenAndServe(":1234", &mux)
+	return mw.Gzip(gzip.DefaultCompression, http.FileServer(http.Dir(StaticFilesPath)))
 }
 
 func IndexPageHandler(db dbservice.DBService) http.HandlerFunc {

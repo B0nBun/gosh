@@ -42,11 +42,11 @@ func (mux *RouterMux) HandleFunc(method, pattern string, handler http.HandlerFun
 	mux.Handle(method, pattern, handler)
 }
 
-func (mux *RouterMux) Get(pattern string, handler http.HandlerFunc) {
+func (mux *RouterMux) Get(pattern string, handler http.Handler) {
 	mux.Handle("GET", pattern, handler)
 }
 
-func (mux *RouterMux) Post(pattern string, handler http.HandlerFunc) {
+func (mux *RouterMux) Post(pattern string, handler http.Handler) {
 	mux.Handle("POST", pattern, handler)
 }
 

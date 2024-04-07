@@ -27,8 +27,8 @@ type DBService struct {
 	db *sql.DB
 }
 
-func MakeDBService() (s DBService, err error) {
-	s.db, err = sql.Open("sqlite3", ":memory:")
+func MakeDBService(dsName string) (s DBService, err error) {
+	s.db, err = sql.Open("sqlite3", dsName)
 	if err != nil {
 		return
 	}
