@@ -33,7 +33,7 @@ func main() {
 	mux.Get("/static/**", mw.Logging(log.Default(), mw.NoTrailingSlash(http.StripPrefix("/static/", fs))))
 	mux.Get("/", mw.Logging(log.Default(), mw.Gzip(gzip.DefaultCompression, IndexPageHandler(db))))
 	mux.Post("/", mw.Logging(log.Default(), mw.Gzip(gzip.DefaultCompression, CreateLinkHandler(db))))
-	mux.Get("/*", mw.Logging(log.Default(), RedirectHandler(db)))
+	mux.Get("/*", mw.Logging(log.Default(), RedirectHandler(db, mux.NotFound)))
 
 	log.Printf("Started server at address '%s'", *addr)
 	http.ListenAndServe(*addr, &mux)
@@ -103,10 +103,14 @@ func CreateLinkHandler(db dbservice.DBService) http.HandlerFunc {
 	}
 }
 
-func RedirectHandler(db dbservice.DBService) http.HandlerFunc {
+func RedirectHandler(db dbservice.DBService, notFoundHandler http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		slug := router.PathPart(r.URL, 0)
-		fullUrl, err := db.GetUrl(slug)
+		fullUrl, err, exists := db.GetUrl(slug)
+		if !exists {
+			notFoundHandler.ServeHTTP(w, r)
+			return
+		}
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

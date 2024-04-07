@@ -15,12 +15,12 @@ type route struct {
 
 type RouterMux struct {
 	routes   []route
-	notFound http.Handler
+	NotFound http.Handler
 }
 
 func NewRouterMux() RouterMux {
 	return RouterMux{
-		notFound: http.HandlerFunc(http.NotFound),
+		NotFound: http.HandlerFunc(http.NotFound),
 	}
 }
 
@@ -51,7 +51,7 @@ func (mux *RouterMux) Post(pattern string, handler http.Handler) {
 }
 
 func (mux *RouterMux) HandleNotFound(handler http.Handler) {
-	mux.notFound = handler
+	mux.NotFound = handler
 }
 
 func (mux *RouterMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -68,7 +68,7 @@ func (mux *RouterMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	mux.notFound.ServeHTTP(w, r)
+	mux.NotFound.ServeHTTP(w, r)
 }
 
 func PathPart(url *url.URL, n int) string {
